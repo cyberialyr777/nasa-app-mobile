@@ -1,98 +1,205 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// App.js
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import axios, { isAxiosError } from 'axios';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Button,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text
+} from 'react-native';
 
-export default function HomeScreen() {
+// 1. Usa la variable de entorno pública de Expo (EXPO_PUBLIC_*) con fallback a la DEMO_KEY
+const NASA_API_KEY = (process.env.EXPO_PUBLIC_NASA_API_KEY as string | undefined) || 'DEMO_KEY';
+
+// Tipo para la respuesta de APOD de la NASA
+type Apod = {
+  date: string;
+  explanation: string;
+  media_type: 'image' | 'video' | string;
+  title: string;
+  url: string;
+  copyright?: string;
+};
+
+export default function App() {
+  // Estados para manejar los datos, el estado de carga y los errores
+  const [apodData, setApodData] = useState<Apod | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Función para obtener los datos de la API
+  const fetchApod = async () => {
+    setLoading(true); // Inicia la carga
+    setError(null);   // Limpia errores previos
+
+    // 2. Bloque try-catch para manejar errores en la petición
+    try {
+      const url = `https://api.nasa.gov/planetary/apod?api_key=${NASA_API_KEY}`;
+      const response = await axios.get(url);
+      setApodData(response.data as Apod); // Guarda los datos en el estado
+    } catch (err) {
+      // 3. Manejo de errores específicos (401, 404, etc.)
+  if (isAxiosError(err)) {
+        if (err.response) {
+          if (err.response.status === 401) {
+            setError('Error 401: La API Key es incorrecta o no autorizada.');
+          } else if (err.response.status === 404) {
+            setError('Error 404: No se encontró el recurso en la API.');
+          } else {
+            setError(`Error del servidor: ${err.response.status}`);
+          }
+        } else if (err.request) {
+          setError('Error de red: No se pudo conectar a la API de la NASA.');
+        } else {
+          setError(`Error inesperado: ${err.message ?? 'desconocido'}`);
+        }
+      } else {
+        setError('Error inesperado no relacionado con la red.');
+      }
+    } finally {
+      setLoading(false); // Termina la carga, tanto si hubo éxito como si hubo error
+    }
+  };
+
+  // useEffect se ejecuta una vez cuando el componente se monta
+  useEffect(() => {
+    fetchApod();
+  }, []); // El array vacío asegura que solo se ejecute una vez al inicio
+
+  // --- Renderizado del componente ---
+
+  // Si está cargando, muestra un indicador de actividad
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color="#0b3d91" />
+        <Text style={styles.loadingText}>Cargando imagen del día...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Si hay un error, muestra el mensaje de error y un botón para reintentar
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.errorText}>Houston, tenemos un problema Houston, we have a problem Houston, we have a problem Houston, we have a problemHouston, we have a problemHouston, we have a problemHouston, we have a problem Houston, we have a problemHouston, we have a problem🚀</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <Button title="Reintentar" onPress={fetchApod} color="#0b3d91" />
+      </SafeAreaView>
+    );
+  }
+
+  // 4. Si todo salió bien, muestra los datos de forma ordenada
+  // Si por alguna razón no hay datos aún, muestra un placeholder seguro
+  if (!apodData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.loadingText}>Sin datos para mostrar.</Text>
+        <Button title="Reintentar" onPress={fetchApod} color="#0b3d91" />
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <Text style={styles.title}>{apodData.title}</Text>
+        <Text style={styles.date}>{apodData.date}</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {/* La API a veces devuelve un video, comprobamos el tipo de medio */}
+        {apodData.media_type === 'image' ? (
+          <Image source={{ uri: apodData.url }} style={styles.image} />
+        ) : (
+          <Text style={styles.mediaNotice}>El contenido de hoy es un video, no se puede mostrar aquí.</Text>
+        )}
+        
+        <Text style={styles.explanationTitle}>Explicación:</Text>
+        <Text style={styles.explanation}>{apodData.explanation}</Text>
+        
+        {apodData.copyright && (
+          <Text style={styles.copyright}>© {apodData.copyright}</Text>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
+// --- Estilos para la aplicación ---
+
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0d1117',
   },
-  stepContainer: {
-    gap: 8,
+  scrollContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  container: { // Para centrar carga y error
+    flex: 1,
+    backgroundColor: '#0d1117',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#c9d1d9',
+    fontSize: 16,
+  },
+  errorText: {
+    color: '#f85149',
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+    marginHorizontal: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#c9d1d9',
+    textAlign: 'center',
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  date: {
+    fontSize: 16,
+    color: '#8b949e',
+    marginBottom: 16,
+  },
+  image: {
+    width: '100%',
+    aspectRatio: 1, // Mantiene la proporción cuadrada, ajusta si es necesario
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#30363d',
+  },
+  mediaNotice: {
+    color: '#8b949e',
+    marginVertical: 40,
+  },
+  explanationTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#c9d1d9',
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  explanation: {
+    fontSize: 16,
+    color: '#c9d1d9',
+    lineHeight: 24,
+    textAlign: 'justify',
+  },
+  copyright: {
+    marginTop: 20,
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#8b949e',
   },
 });
